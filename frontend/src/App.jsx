@@ -198,7 +198,10 @@ function App() {
               ) : dataResponse?.data && Array.isArray(dataResponse.data) ? (
                 dataResponse.data.length > 0 ? (
                   <div className="table-container" style={{ overflowX: "auto", marginTop: "15px" }}>
-                    <table className="data-table" style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+                    <table
+                      className="data-table"
+                      style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}
+                    >
                       <thead>
                         <tr style={{ borderBottom: "2px solid #444", paddingBottom: "8px" }}>
                           <th style={{ padding: "10px" }}>Device ID</th>
@@ -210,16 +213,23 @@ function App() {
                       <tbody>
                         {dataResponse.data.slice(0, 50).map((row, index) => (
                           <tr key={index} style={{ borderBottom: "1px solid #333" }}>
-                            <td style={{ padding: "10px", fontFamily: "monospace" }}>{row.device_id}</td>
+                            <td style={{ padding: "10px", fontFamily: "monospace" }}>
+                              {row.device_id}
+                            </td>
                             <td style={{ padding: "10px" }}>{row.timestamp}</td>
-                            <td style={{ padding: "10px", fontWeight: "bold", color: "#4ade80" }}>{row.kwh} kWh</td>
+                            <td style={{ padding: "10px", fontWeight: "bold", color: "#4ade80" }}>
+                              {row.kwh} kWh
+                            </td>
                             <td style={{ padding: "10px" }}>{row.location}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                     {dataResponse.data.length > 50 && (
-                      <p className="muted" style={{ fontSize: "12px", marginTop: "10px", textAlign: "center" }}>
+                      <p
+                        className="muted"
+                        style={{ fontSize: "12px", marginTop: "10px", textAlign: "center" }}
+                      >
                         * Showing first 50 records for performance.
                       </p>
                     )}
