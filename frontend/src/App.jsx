@@ -58,10 +58,8 @@ function App() {
     const logoutUri = LOGOUT_URI;
     const cognitoDomain = COGNITO_DOMAIN;
 
-    // Clear local OIDC user (react-oidc-context)
     auth.removeUser();
 
-    // Redirect to Cognito logout endpoint
     window.location.href =
       `${cognitoDomain}/logout?client_id=${clientId}` +
       `&logout_uri=${encodeURIComponent(logoutUri)}`;
@@ -76,6 +74,12 @@ function App() {
     } catch (copyError) {
       setError("Unable to copy token to clipboard.");
     }
+  };
+
+  // Helper pentru a calcula totalul de kWh din datele primite
+  const calculateTotalKwh = (items) => {
+    if (!items || !Array.isArray(items)) return 0;
+    return items.reduce((sum, item) => sum + (Number(item.kwh) || 0), 0);
   };
 
   if (auth.isLoading) {
@@ -121,6 +125,9 @@ function App() {
               <p className="status-line">
                 <span className="status-dot status-dot-online" />
                 Logged in as <strong>{auth.user?.profile?.email || "(no email claim)"}</strong>
+                <span className="badge" style={{ marginLeft: "10px", textTransform: "uppercase" }}>
+                  Role: {dataResponse?.role || "fetching..."}
+                </span>
               </p>
               <button className="btn btn-secondary" onClick={signOutRedirect}>
                 Sign out
@@ -172,12 +179,54 @@ function App() {
               )}
             </section>
 
+            {/* SECȚIUNEA NOUĂ PENTRU DATELE DIN BLOB STORAGE CSV */}
             <section className="card card-wide">
-              <h2>Data API Response</h2>
+              <div className="section-head">
+                <h2>Energy Data Logs (from Azure Blob Storage)</h2>
+                {dataResponse?.data && (
+                  <div className="stats-badges">
+                    <span className="badge">Total Records: {dataResponse.data.length}</span>
+                    <span className="badge badge-success">
+                      Total Consumption: {calculateTotalKwh(dataResponse.data).toFixed(2)} kWh
+                    </span>
+                  </div>
+                )}
+              </div>
+
               {loadingData ? (
-                <p className="muted">Loading data...</p>
-              ) : dataResponse ? (
-                <pre className="code-block">{JSON.stringify(dataResponse, null, 2)}</pre>
+                <p className="muted">Loading energy data from CSV...</p>
+              ) : dataResponse?.data && Array.isArray(dataResponse.data) ? (
+                dataResponse.data.length > 0 ? (
+                  <div className="table-container" style={{ overflowX: "auto", marginTop: "15px" }}>
+                    <table className="data-table" style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+                      <thead>
+                        <tr style={{ borderBottom: "2px solid #444", paddingBottom: "8px" }}>
+                          <th style={{ padding: "10px" }}>Device ID</th>
+                          <th style={{ padding: "10px" }}>Timestamp</th>
+                          <th style={{ padding: "10px" }}>Consumption (kWh)</th>
+                          <th style={{ padding: "10px" }}>Location</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dataResponse.data.slice(0, 50).map((row, index) => (
+                          <tr key={index} style={{ borderBottom: "1px solid #333" }}>
+                            <td style={{ padding: "10px", fontFamily: "monospace" }}>{row.device_id}</td>
+                            <td style={{ padding: "10px" }}>{row.timestamp}</td>
+                            <td style={{ padding: "10px", fontWeight: "bold", color: "#4ade80" }}>{row.kwh} kWh</td>
+                            <td style={{ padding: "10px" }}>{row.location}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {dataResponse.data.length > 50 && (
+                      <p className="muted" style={{ fontSize: "12px", marginTop: "10px", textAlign: "center" }}>
+                        * Showing first 50 records for performance.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="muted">No data rows found matching your Device ID permissions.</p>
+                )
               ) : (
                 <p className="muted">No data loaded yet.</p>
               )}
