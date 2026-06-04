@@ -32,11 +32,20 @@ async function getEnergyData() {
   const lines = csv.trim().split(/\r?\n/);
   if (lines.length < 2) return [];
 
-  const headers = lines[0].split(",").map((h) => h.trim());
+  // Curățăm headers-urile de caractere speciale ascunse (BOM) și spații
+  const headers = lines[0].split(",").map((h) => h.trim().replace(/^\uFEFF/, ""));
 
   return lines.slice(1).map((line) => {
     const values = line.split(",").map((v) => v.trim());
-    return Object.fromEntries(headers.map((h, i) => [h, values[i]]));
+    const rawObject = Object.fromEntries(headers.map((h, i) => [h, values[i]]));
+
+    // 🔥 TOLERANȚĂ FORMAT: Ne asigurăm că returnăm un obiect standard pe care să îl recunoască filtrarea de mai jos
+    return {
+      device_id: rawObject.device_id || rawObject.deviceId || rawObject.Device_ID || "N/A",
+      consumption: rawObject.consumption || rawObject.value || rawObject.consumption_kwh || 0,
+      timestamp: rawObject.timestamp || rawObject.Time || "N/A",
+      location: rawObject.location || "Cluj-Napoca",
+    };
   });
 }
 
@@ -68,6 +77,7 @@ module.exports = async function data(context, req) {
         finishRequest(context, request, 403);
         return;
       }
+      // Filtrarea va funcționa acum garantat deoarece am normalizat device_id în getEnergyData
       visibleData = allData.filter((item) => item.device_id === device_id);
     } else {
       context.res = jsonResponseWithCorrelation(
@@ -79,21 +89,25 @@ module.exports = async function data(context, req) {
       return;
     }
 
+    // Returnăm direct array-ul sau obiectul cerut
     context.res = jsonResponseWithCorrelation(
       200,
       {
         role,
         device_id,
-        data: visibleData,
+        logs: visibleData, // Păstrăm structura ca obiect valid încapsulat
       },
       request.correlationId
     );
     finishRequest(context, request, 200);
   } catch (error) {
+    // Trimitem eroarea reală în consolă în Azure ca să o poți diagnostica în Log Stream dacă e cazul
+    context.log.error("Backend Error:", error);
+
     const normalized = normalizeError(error);
     context.res = jsonResponseWithCorrelation(
       normalized.status,
-      { error: normalized.clientMessage },
+      { error: normalized.clientMessage, details: error.message },
       request.correlationId
     );
     finishRequest(context, request, normalized.status);
