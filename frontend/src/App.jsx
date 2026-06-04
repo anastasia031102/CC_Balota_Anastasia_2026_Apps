@@ -90,7 +90,21 @@ function App() {
     );
   }
 
+  // 🔽 BLOC MODIFICAT PENTRU BYPASS AUTOMAT AL ERORII DE STATE 🔽
   if (auth.error) {
+    const errMsg = auth.error.message?.toLowerCase() || "";
+    if (errMsg.includes("state") || errMsg.includes("storage") || errMsg.includes("validate")) {
+      setTimeout(() => {
+        // Ștergem „mizeria” de code și state din URL și reîncărcăm curat pe /
+        window.location.href = window.location.origin + window.location.pathname;
+      }, 400);
+      return (
+        <div className="app-shell">
+          <div className="status-panel">Sincronizare sesiune securizată... Se reîncarcă...</div>
+        </div>
+      );
+    }
+
     return (
       <div className="app-shell">
         <div className="status-panel status-panel-error">
@@ -99,6 +113,7 @@ function App() {
       </div>
     );
   }
+  // 🔼 SFÂRȘIT BLOC MODIFICAT 🔼
 
   return (
     <div className="app-shell">
