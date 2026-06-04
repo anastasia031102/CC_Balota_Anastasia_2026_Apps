@@ -8,17 +8,17 @@ const {
 const { emit, finishRequest, maskDeviceId, startRequest } = require("../shared/logging");
 
 async function getEnergyData() {
-  // Am spart stringul tău în bucăți ca să păcălim Push Protection de la GitHub
-  const p1 = "DefaultEndpointsProtocol=https;AccountName=sttucnccdevbalotaa29ymyv;";
-  const p2 =
-    "AccountKey=Cpuheg0cUJXN3dh2P06y4Nzao7Uawz3Vb6jnqPH0eAR01Gf2Nrvfb67tN8eUIvL8BDqBWBztrrhw+ASt0Efzhw==;";
-  const p3 = "EndpointSuffix=core.windows.net";
+  // COD CURAT: Preluăm cheia direct din variabilele de mediu din Azure
+  const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
 
-  const connectionString = p1 + p2 + p3;
   const containerName = "datasets";
   const blobName = "energy_usage_large.csv";
 
-  // Conexiune directă prin cheie
+  if (!connectionString) {
+    throw new Error("AZURE_STORAGE_CONNECTION_STRING is missing from Azure App Settings!");
+  }
+
+  // Ne conectăm utilizând variabila securizată
   const client = BlobServiceClient.fromConnectionString(connectionString);
   const containerClient = client.getContainerClient(containerName);
   const blobClient = containerClient.getBlobClient(blobName);
