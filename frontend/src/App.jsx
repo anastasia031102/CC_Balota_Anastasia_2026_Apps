@@ -48,10 +48,7 @@ function App() {
         if (!res.ok) throw new Error("Error calling /api/data");
         return res.json();
       })
-      .then((data) => {
-        // Păstrăm structura originală, dar ne asigurăm că e transformată corect în Array pentru tabel
-        setDataResponse(data);
-      })
+      .then((data) => setDataResponse(data))
       .catch((err) => setError(err.message))
       .finally(() => setLoadingData(false));
   }, [idToken]);
@@ -80,16 +77,6 @@ function App() {
       setError("Unable to copy token to clipboard.");
     }
   };
-
-  // Conversie sigură a răspunsului de date într-un array parcurgător pentru tabel
-  const getLogsArray = () => {
-    if (!dataResponse) return [];
-    if (Array.isArray(dataResponse)) return dataResponse;
-    if (Array.isArray(dataResponse.logs)) return dataResponse.logs;
-    return [];
-  };
-
-  const energyLogs = getLogsArray();
 
   if (auth.isLoading) {
     return (
@@ -190,79 +177,7 @@ function App() {
               {loadingData ? (
                 <p className="muted">Loading data...</p>
               ) : dataResponse ? (
-                energyLogs.length > 0 ? (
-                  <div style={{ overflowX: "auto", marginTop: "10px" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", color: "inherit" }}>
-                      <thead>
-                        <tr style={{ backgroundColor: "rgba(255,255,255,0.1)", textAlign: "left" }}>
-                          <th
-                            style={{ padding: "12px", border: "1px solid rgba(255,255,255,0.2)" }}
-                          >
-                            ID Dispozitiv
-                          </th>
-                          <th
-                            style={{ padding: "12px", border: "1px solid rgba(255,255,255,0.2)" }}
-                          >
-                            Consum (kWh)
-                          </th>
-                          <th
-                            style={{ padding: "12px", border: "1px solid rgba(255,255,255,0.2)" }}
-                          >
-                            Timestamp
-                          </th>
-                          <th
-                            style={{ padding: "12px", border: "1px solid rgba(255,255,255,0.2)" }}
-                          >
-                            Locație
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {energyLogs.map((log, index) => (
-                          <tr
-                            key={index}
-                            style={{
-                              backgroundColor:
-                                index % 2 === 0 ? "rgba(255,255,255,0.03)" : "transparent",
-                            }}
-                          >
-                            <td
-                              style={{
-                                padding: "12px",
-                                border: "1px solid rgba(255,255,255,0.1)",
-                                fontWeight: "bold",
-                              }}
-                            >
-                              {log.deviceId || log.device_id || "N/A"}
-                            </td>
-                            <td
-                              style={{
-                                padding: "12px",
-                                border: "1px solid rgba(255,255,255,0.1)",
-                                color: "#007bff",
-                                fontWeight: "bold",
-                              }}
-                            >
-                              {log.consumption || log.value || 0} kWh
-                            </td>
-                            <td
-                              style={{ padding: "12px", border: "1px solid rgba(255,255,255,0.1)" }}
-                            >
-                              {log.timestamp || "N/A"}
-                            </td>
-                            <td
-                              style={{ padding: "12px", border: "1px solid rgba(255,255,255,0.1)" }}
-                            >
-                              {log.location || "Cluj-Napoca"}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <pre className="code-block">{JSON.stringify(dataResponse, null, 2)}</pre>
-                )
+                <pre className="code-block">{JSON.stringify(dataResponse, null, 2)}</pre>
               ) : (
                 <p className="muted">No data loaded yet.</p>
               )}
