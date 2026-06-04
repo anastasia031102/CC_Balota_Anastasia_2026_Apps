@@ -1,247 +1,275 @@
 import React, { useEffect, useState } from "react";
-import { COGNITO_DOMAIN, OIDC_CONFIG, API_BASE } from "./config";
+import { useAuth } from "react-oidc-context";
+import { API_BASE, COGNITO_DOMAIN, LOGOUT_URI, OIDC_CONFIG } from "./config";
+import "./App.css";
 
 function App() {
-  const [token, setToken] = useState(localStorage.getItem("user_token") || null);
-  const [energyData, setEnergyData] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const auth = useAuth();
+
+  const [profile, setProfile] = useState(null);
+  const [dataResponse, setDataResponse] = useState(null);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [loadingData, setLoadingData] = useState(false);
   const [error, setError] = useState(null);
+  const [showToken, setShowToken] = useState(false);
+  const [copied, setCopied] = useState(false);
 
+  const idToken = auth.user?.id_token;
+
+  // Call backend when we have an idToken
   useEffect(() => {
-    // 1. Verificăm dacă ne-am întors de la Cognito cu token în URL
-    const hash = window.location.hash;
-    if (hash) {
-      const params = new URLSearchParams(hash.replace("#", "?"));
-      const accessToken = params.get("access_token") || params.get("id_token");
-
-      if (accessToken) {
-        localStorage.setItem("user_token", accessToken);
-        setToken(accessToken);
-        // Curățăm URL-ul INSTANT
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
+    if (!idToken) {
+      setProfile(null);
+      setDataResponse(null);
+      return;
     }
-  }, []);
 
-  // 2. Încărcăm datele din Azure Function când avem token
-  useEffect(() => {
-    if (token) {
-      setLoading(true);
-      setError(null);
+    setError(null);
 
-      fetch(`${API_BASE}/api/data`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+    // /api/profile
+    setLoadingProfile(true);
+    fetch(`${API_BASE}/api/profile`, {
+      headers: { Authorization: `Bearer ${idToken}` },
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Error calling /api/profile");
+        return res.json();
       })
-        .then((res) => {
-          if (!res.ok) throw new Error(`Status: ${res.status}`);
-          return res.json();
-        })
-        .then((data) => {
-          setEnergyData(Array.isArray(data) ? data : data.logs || []);
-          setLoading(false);
-        })
-        .catch((err) => {
-          console.error("Error fetching data:", err);
-          setError("Nu s-au putut încărca datele din Azure Blob Storage.");
-          setLoading(false);
-        });
+      .then((data) => setProfile(data))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoadingProfile(false));
+
+    // /api/data
+    setLoadingData(true);
+    fetch(`${API_BASE}/api/data`, {
+      headers: { Authorization: `Bearer ${idToken}` },
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Error calling /api/data");
+        return res.json();
+      })
+      .then((data) => {
+        // Păstrăm structura originală, dar ne asigurăm că e transformată corect în Array pentru tabel
+        setDataResponse(data);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoadingData(false));
+  }, [idToken]);
+
+  const signOutRedirect = () => {
+    const clientId = OIDC_CONFIG.client_id;
+    const logoutUri = LOGOUT_URI;
+    const cognitoDomain = COGNITO_DOMAIN;
+
+    // Clear local OIDC user (react-oidc-context)
+    auth.removeUser();
+
+    // Redirect to Cognito logout endpoint
+    window.location.href =
+      `${cognitoDomain}/logout?client_id=${clientId}` +
+      `&logout_uri=${encodeURIComponent(logoutUri)}`;
+  };
+
+  const copyToken = async () => {
+    if (!idToken) return;
+    try {
+      await navigator.clipboard.writeText(idToken);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch (copyError) {
+      setError("Unable to copy token to clipboard.");
     }
-  }, [token]);
-
-  const handleLogin = () => {
-    const loginUrl = `${COGNITO_DOMAIN}/login?client_id=${OIDC_CONFIG.client_id}&response_type=token&scope=openid+email+profile&redirect_uri=${encodeURIComponent(OIDC_CONFIG.redirect_uri)}`;
-    window.location.href = loginUrl;
   };
 
-  // 🔥 CORECTAT: Curățăm starea direct în React ca ecranul să se schimbe INSTANTANEU la click!
-  const handleLogout = () => {
-    localStorage.removeItem("user_token");
-    setToken(null); // ⬅️ Asta va forța React să ascundă imediat panoul de Admin!
-    setEnergyData([]); // Golește tabelul vechi
-
-    // Opțional: Te trimitem la link-ul curat de acasă
-    window.location.href = OIDC_CONFIG.redirect_uri;
+  // Conversie sigură a răspunsului de date într-un array parcurgător pentru tabel
+  const getLogsArray = () => {
+    if (!dataResponse) return [];
+    if (Array.isArray(dataResponse)) return dataResponse;
+    if (Array.isArray(dataResponse.logs)) return dataResponse.logs;
+    return [];
   };
 
-  // ECRANUL SECURIZAT (Vizibil DOAR când starea 'token' NU este nullă)
-  if (token) {
+  const energyLogs = getLogsArray();
+
+  if (auth.isLoading) {
     return (
-      <div
-        style={{
-          padding: "30px",
-          fontFamily: "Arial, sans-serif",
-          backgroundColor: "#f8f9fa",
-          minHeight: "100vh",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "20px",
-            borderBottom: "2px solid #dee2e6",
-            paddingBottom: "15px",
-          }}
-        >
-          <div>
-            <h2 style={{ color: "#28a745", margin: 0 }}>ROLE: ADMIN (Autentificat cu succes)</h2>
-            <p style={{ color: "#6c757d", margin: "5px 0 0 0" }}>
-              Sistem conectat securizat prin AWS Cognito
-            </p>
-          </div>
-          <button
-            onClick={handleLogout}
-            style={{
-              padding: "10px 20px",
-              backgroundColor: "#dc3545",
-              color: "white",
-              border: "none",
-              borderRadius: "5px",
-              cursor: "pointer",
-              fontWeight: "bold",
-            }}
-          >
-            Sign Out
-          </button>
-        </div>
+      <div className="app-shell">
+        <div className="status-panel">Loading authentication...</div>
+      </div>
+    );
+  }
 
-        <div
-          style={{
-            background: "white",
-            padding: "20px",
-            borderRadius: "8px",
-            boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
-          }}
-        >
-          <h3 style={{ marginTop: 0, color: "#495057" }}>
-            ⚡ Date Energetice (Azure Blob Storage)
-          </h3>
-
-          {loading && (
-            <p style={{ color: "#007bff", fontWeight: "bold" }}>
-              🔄 Se încarcă datele din cloud...
-            </p>
-          )}
-
-          {error && (
-            <div
-              style={{
-                background: "#f8d7da",
-                color: "#721c24",
-                padding: "15px",
-                borderRadius: "5px",
-                marginBottom: "15px",
-              }}
-            >
-              ⚠️ {error}
-            </div>
-          )}
-
-          {!loading && !error && energyData.length === 0 && (
-            <p style={{ color: "#6c757d", fontStyle: "italic" }}>
-              Nu există loguri energetice disponibile în containerul de stocare.
-            </p>
-          )}
-
-          {!loading && energyData.length > 0 && (
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", marginTop: "15px" }}>
-                <thead>
-                  <tr style={{ backgroundColor: "#343a40", color: "white", textAlign: "left" }}>
-                    <th style={{ padding: "12px", border: "1px solid #dee2e6" }}>ID Dispozitiv</th>
-                    <th style={{ padding: "12px", border: "1px solid #dee2e6" }}>Consum (kWh)</th>
-                    <th style={{ padding: "12px", border: "1px solid #dee2e6" }}>Timestamp</th>
-                    <th style={{ padding: "12px", border: "1px solid #dee2e6" }}>Locație</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {energyData.map((log, index) => (
-                    <tr
-                      key={index}
-                      style={{ backgroundColor: index % 2 === 0 ? "#ffffff" : "#f1f3f5" }}
-                    >
-                      <td
-                        style={{ padding: "12px", border: "1px solid #dee2e6", fontWeight: "bold" }}
-                      >
-                        {log.deviceId || log.device_id || "N/A"}
-                      </td>
-                      <td
-                        style={{
-                          padding: "12px",
-                          border: "1px solid #dee2e6",
-                          color: "#007bff",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        {log.consumption || log.value || 0} kWh
-                      </td>
-                      <td style={{ padding: "12px", border: "1px solid #dee2e6" }}>
-                        {log.timestamp || "N/A"}
-                      </td>
-                      <td style={{ padding: "12px", border: "1px solid #dee2e6" }}>
-                        {log.location || "Cluj-Napoca"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+  if (auth.error) {
+    return (
+      <div className="app-shell">
+        <div className="status-panel status-panel-error">
+          Encountering error... {auth.error.message}
         </div>
       </div>
     );
   }
 
-  // ECRANUL DE PORNIRE (Vizibil DOAR când starea 'token' este nullă)
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        height: "100vh",
-        fontFamily: "Arial, sans-serif",
-        backgroundColor: "#343a40",
-        color: "white",
-      }}
-    >
-      <div
-        style={{
-          background: "rgba(255,255,255,0.1)",
-          padding: "40px",
-          borderRadius: "10px",
-          backdropFilter: "blur(5px)",
-          textAlign: "center",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
-        }}
-      >
-        <h1 style={{ marginBottom: "10px", fontSize: "2.5rem" }}>⚡ Monitorizare Energie Cloud</h1>
-        <p style={{ color: "#adb5bd", marginBottom: "30px" }}>
-          Proiect Cloud Computing - Universitatea Tehnică din Cluj-Napoca
-        </p>
-        <button
-          onClick={handleLogin}
-          style={{
-            padding: "15px 30px",
-            fontSize: "18px",
-            color: "white",
-            backgroundColor: "#28a745",
-            border: "none",
-            borderRadius: "5px",
-            cursor: "pointer",
-            fontWeight: "bold",
-            boxShadow: "0 4px 15px rgba(40,167,69,0.4)",
-          }}
-        >
-          🔒 Sign In securizat cu AWS Cognito
-        </button>
-      </div>
+    <div className="app-shell">
+      <div className="bg-orb bg-orb-left" />
+      <div className="bg-orb bg-orb-right" />
+      <main className="app">
+        <header className="hero">
+          <p className="hero-kicker">Identity + Serverless</p>
+          <h1>Cloud Computing App</h1>
+          <p className="hero-subtitle">
+            Secure frontend with Amazon Cognito authentication and Azure Functions APIs.
+          </p>
+        </header>
+
+        {error && (
+          <div className="alert">
+            <strong>Error:</strong> {error}
+          </div>
+        )}
+
+        <section className="card status-card">
+          {auth.isAuthenticated ? (
+            <>
+              <p className="status-line">
+                <span className="status-dot status-dot-online" />
+                Logged in as <strong>{auth.user?.profile?.email || "(no email claim)"}</strong>
+              </p>
+              <button className="btn btn-secondary" onClick={signOutRedirect}>
+                Sign out
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="status-line">
+                <span className="status-dot" />
+                Not logged in
+              </p>
+              <button className="btn" onClick={() => auth.signinRedirect()}>
+                Sign in
+              </button>
+            </>
+          )}
+        </section>
+
+        {auth.isAuthenticated && (
+          <div className="grid">
+            <section className="card">
+              <div className="section-head">
+                <h2>Authentication Token</h2>
+                <div className="actions">
+                  <button
+                    className="btn btn-small btn-ghost"
+                    onClick={() => setShowToken((current) => !current)}
+                  >
+                    {showToken ? "Hide" : "Show"}
+                  </button>
+                  <button className="btn btn-small btn-ghost" onClick={copyToken}>
+                    {copied ? "Copied" : "Copy"}
+                  </button>
+                </div>
+              </div>
+              <pre className="code-block">
+                ID Token: {showToken ? auth.user?.id_token : "••••••••••••••••••••"}
+              </pre>
+            </section>
+
+            <section className="card">
+              <h2>User Profile API Response</h2>
+              {loadingProfile ? (
+                <p className="muted">Loading profile...</p>
+              ) : profile ? (
+                <pre className="code-block">{JSON.stringify(profile, null, 2)}</pre>
+              ) : (
+                <p className="muted">No profile loaded yet.</p>
+              )}
+            </section>
+
+            <section className="card card-wide">
+              <h2>Data API Response</h2>
+              {loadingData ? (
+                <p className="muted">Loading data...</p>
+              ) : dataResponse ? (
+                energyLogs.length > 0 ? (
+                  <div style={{ overflowX: "auto", marginTop: "10px" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", color: "inherit" }}>
+                      <thead>
+                        <tr style={{ backgroundColor: "rgba(255,255,255,0.1)", textAlign: "left" }}>
+                          <th
+                            style={{ padding: "12px", border: "1px solid rgba(255,255,255,0.2)" }}
+                          >
+                            ID Dispozitiv
+                          </th>
+                          <th
+                            style={{ padding: "12px", border: "1px solid rgba(255,255,255,0.2)" }}
+                          >
+                            Consum (kWh)
+                          </th>
+                          <th
+                            style={{ padding: "12px", border: "1px solid rgba(255,255,255,0.2)" }}
+                          >
+                            Timestamp
+                          </th>
+                          <th
+                            style={{ padding: "12px", border: "1px solid rgba(255,255,255,0.2)" }}
+                          >
+                            Locație
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {energyLogs.map((log, index) => (
+                          <tr
+                            key={index}
+                            style={{
+                              backgroundColor:
+                                index % 2 === 0 ? "rgba(255,255,255,0.03)" : "transparent",
+                            }}
+                          >
+                            <td
+                              style={{
+                                padding: "12px",
+                                border: "1px solid rgba(255,255,255,0.1)",
+                                fontWeight: "bold",
+                              }}
+                            >
+                              {log.deviceId || log.device_id || "N/A"}
+                            </td>
+                            <td
+                              style={{
+                                padding: "12px",
+                                border: "1px solid rgba(255,255,255,0.1)",
+                                color: "#007bff",
+                                fontWeight: "bold",
+                              }}
+                            >
+                              {log.consumption || log.value || 0} kWh
+                            </td>
+                            <td
+                              style={{ padding: "12px", border: "1px solid rgba(255,255,255,0.1)" }}
+                            >
+                              {log.timestamp || "N/A"}
+                            </td>
+                            <td
+                              style={{ padding: "12px", border: "1px solid rgba(255,255,255,0.1)" }}
+                            >
+                              {log.location || "Cluj-Napoca"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <pre className="code-block">{JSON.stringify(dataResponse, null, 2)}</pre>
+                )
+              ) : (
+                <p className="muted">No data loaded yet.</p>
+              )}
+            </section>
+          </div>
+        )}
+      </main>
     </div>
   );
 }
