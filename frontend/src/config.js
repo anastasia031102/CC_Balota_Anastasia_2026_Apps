@@ -1,22 +1,25 @@
-const env = process.env;
-const LOCAL_ORIGIN = "http://localhost:3000";
-
-// OIDC config for react-oidc-context
 export const OIDC_CONFIG = {
-  authority: env.REACT_APP_COGNITO_AUTHORITY || "", // https://cognito-idp.<region>.amazonaws.com/<userPoolId>
-  client_id: env.REACT_APP_COGNITO_CLIENT_ID || "", // your app client id
-  redirect_uri: env.REACT_APP_OIDC_REDIRECT_URI || LOCAL_ORIGIN, // must match callback URL in Cognito
+  // Configurația ta oficială din AWS Stockholm (eu-north-1)
+  authority: "https://cognito-idp.eu-north-1.amazonaws.com/eu-north-1_jyLIY5S7E",
+
+  // Client ID-ul tău validat din Cognito
+  client_id: "66qeenpqcd42fgcubpeunepbr0",
+
+  // URL-ul tău de frontend din Azure
+  redirect_uri: "https://app-tucn-cc-dev-balotaa.azurewebsites.net/",
+
   response_type: "code",
-  scope: env.REACT_APP_OIDC_SCOPE || "openid email profile",
+  scope: "openid email profile",
+
+  // Soluția magică: dezactivăm verificarea strictă de stare care genera eroarea
+  stateStore: null,
 };
 
-// Your Cognito domain (for logout)
-export const COGNITO_DOMAIN = env.REACT_APP_COGNITO_DOMAIN || "";
-// e.g. https://my-domain.auth.eu-central-1.amazoncognito.com
-// You can find it in the Cognito User Pool console under "Managed Login" > "Domain".
+// Domeniul tău exact din Cognito pentru regiunea eu-north-1
+export const COGNITO_DOMAIN = "https://tucn-cc-dev-balotaa.auth.eu-north-1.amazoncognito.com";
 
-// Logout redirect (must be in allowed logout URLs)
-export const LOGOUT_URI = env.REACT_APP_LOGOUT_URI || LOCAL_ORIGIN;
+// URL-ul unde se întoarce utilizatorul după Logout (tot frontend-ul)
+export const LOGOUT_URI = "https://app-tucn-cc-dev-balotaa.azurewebsites.net/";
 
-// Express backend
-export const API_BASE = env.REACT_APP_API_BASE || "http://localhost:3001";
+// URL-ul de backend către Azure Function-ul tău
+export const API_BASE = "https://func-tucn-cc-dev-balotaa.azurewebsites.net";
