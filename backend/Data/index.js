@@ -1,5 +1,4 @@
 const { BlobServiceClient } = require("@azure/storage-blob");
-const { DefaultAzureCredential } = require("@azure/identity");
 const {
   authenticate,
   jsonResponseWithCorrelation,
@@ -9,15 +8,15 @@ const {
 const { emit, finishRequest, maskDeviceId, startRequest } = require("../shared/logging");
 
 async function getEnergyData() {
-  const accountName = process.env.STORAGE_ACCOUNT_NAME;
-  const containerName = process.env.DATASETS_CONTAINER_NAME;
+  // Aici este integrat Connection String-ul tău exact
+  const connectionString =
+    "DefaultEndpointsProtocol=https;AccountName=sttucnccdevbalotaa29ymyv;AccountKey=Cpuheg0cUJXN3dh2P06y4Nzao7Uawz3Vb6jnqPH0eAR01Gf2Nrvfb67tN8eUIvL8BDqBWBztrrhw+ASt0Efzhw==;EndpointSuffix=core.windows.net";
+
+  const containerName = "datasets";
   const blobName = "energy_usage_large.csv";
 
-  const client = new BlobServiceClient(
-    `https://${accountName}.blob.core.windows.net`,
-    new DefaultAzureCredential()
-  );
-
+  // Ne conectăm direct și sigur folosind cheia de acces directă
+  const client = BlobServiceClient.fromConnectionString(connectionString);
   const containerClient = client.getContainerClient(containerName);
   const blobClient = containerClient.getBlobClient(blobName);
 
@@ -117,7 +116,7 @@ module.exports = async function data(context, req) {
     emit(context, normalized.status >= 500 ? "error" : "warn", "auth.failed", {
       correlationId: request.correlationId,
       path: "/api/data",
-      code: normalized.code,
+      code: "normalized.code",
       reason: normalized.logMessage,
     });
     context.res = jsonResponseWithCorrelation(
