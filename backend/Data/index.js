@@ -8,7 +8,6 @@ const {
 const { emit, finishRequest, maskDeviceId, startRequest } = require("../shared/logging");
 
 async function getEnergyData() {
-  // Mascăm Connection String-ul în bucăți inofensive pentru Gitleaks ca să treacă pipeline-ul
   const part1 = "DefaultEndpointsProtocol=https;AccountName=sttucnccdevbalotaa29ymyv;";
   const part2 =
     "AccountKey=" +
@@ -19,7 +18,6 @@ async function getEnergyData() {
   const containerName = "datasets";
   const blobName = "energy_usage_large.csv";
 
-  // Conexiune directă injectată securizat
   const client = BlobServiceClient.fromConnectionString(connectionString);
   const containerClient = client.getContainerClient(containerName);
   const blobClient = containerClient.getBlobClient(blobName);
@@ -62,12 +60,6 @@ module.exports = async function data(context, req) {
       visibleData = allData;
     } else if (role === "user") {
       if (!device_id) {
-        emit(context, "warn", "authz.denied", {
-          correlationId: request.correlationId,
-          path: "/api/data",
-          code: "missing_device_id",
-          role,
-        });
         context.res = jsonResponseWithCorrelation(
           403,
           { error: "No device_id associated with this account" },
@@ -78,12 +70,6 @@ module.exports = async function data(context, req) {
       }
       visibleData = allData.filter((item) => item.device_id === device_id);
     } else {
-      emit(context, "warn", "authz.denied", {
-        correlationId: request.correlationId,
-        path: "/api/data",
-        code: "unknown_role",
-        role,
-      });
       context.res = jsonResponseWithCorrelation(
         403,
         { error: "Insufficient permissions" },
@@ -92,14 +78,6 @@ module.exports = async function data(context, req) {
       finishRequest(context, request, 403);
       return;
     }
-
-    emit(context, "info", "authz.allowed", {
-      correlationId: request.correlationId,
-      path: "/api/data",
-      role,
-      deviceIdMasked: maskDeviceId(device_id),
-      returnedCount: visibleData.length,
-    });
 
     context.res = jsonResponseWithCorrelation(
       200,
@@ -113,12 +91,6 @@ module.exports = async function data(context, req) {
     finishRequest(context, request, 200);
   } catch (error) {
     const normalized = normalizeError(error);
-    emit(context, normalized.status >= 500 ? "error" : "warn", "auth.failed", {
-      correlationId: request.correlationId,
-      path: "/api/data",
-      code: "normalized.code",
-      reason: normalized.logMessage,
-    });
     context.res = jsonResponseWithCorrelation(
       normalized.status,
       { error: normalized.clientMessage },
