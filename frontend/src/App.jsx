@@ -8,7 +8,7 @@ function App() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // 1. Verificăm dacă ne-am întors de la Cognito cu token în URL (#access_token=...)
+    // 1. Verificăm dacă ne-am întors de la Cognito cu token în URL
     const hash = window.location.hash;
     if (hash) {
       const params = new URLSearchParams(hash.replace("#", "?"));
@@ -17,19 +17,18 @@ function App() {
       if (accessToken) {
         localStorage.setItem("user_token", accessToken);
         setToken(accessToken);
-        // Curățăm URL-ul INSTANT ca să nu poată da loop niciodată!
+        // Curățăm URL-ul INSTANT
         window.history.replaceState({}, document.title, window.location.pathname);
       }
     }
   }, []);
 
-  // 2. Încărcăm datele din Azure Function imediat ce avem token-ul valid
+  // 2. Încărcăm datele din Azure Function când avem token
   useEffect(() => {
     if (token) {
       setLoading(true);
       setError(null);
 
-      // Apelăm ruta /api/data trimisă către backend-ul din Azure, adăugând Token-ul în Header pentru securitate
       fetch(`${API_BASE}/api/data`, {
         method: "GET",
         headers: {
@@ -38,13 +37,10 @@ function App() {
         },
       })
         .then((res) => {
-          if (!res.ok) {
-            throw new Error(`Serverul a răspuns cu status: ${res.status}`);
-          }
+          if (!res.ok) throw new Error(`Status: ${res.status}`);
           return res.json();
         })
         .then((data) => {
-          // Asigură-te că stochezi array-ul corect de date trimis de Azure Function
           setEnergyData(Array.isArray(data) ? data : data.logs || []);
           setLoading(false);
         })
@@ -61,13 +57,17 @@ function App() {
     window.location.href = loginUrl;
   };
 
+  // 🔥 CORECTAT: Curățăm starea direct în React ca ecranul să se schimbe INSTANTANEU la click!
   const handleLogout = () => {
     localStorage.removeItem("user_token");
-    setToken(null);
+    setToken(null); // ⬅️ Asta va forța React să ascundă imediat panoul de Admin!
+    setEnergyData([]); // Golește tabelul vechi
+
+    // Opțional: Te trimitem la link-ul curat de acasă
     window.location.href = OIDC_CONFIG.redirect_uri;
   };
 
-  // Ecranul securizat pentru ADMIN (Când utilizatorul este logat)
+  // ECRANUL SECURIZAT (Vizibil DOAR când starea 'token' NU este nullă)
   if (token) {
     return (
       <div
@@ -81,7 +81,7 @@ function App() {
         <div
           style={{
             display: "flex",
-            justifyContent: "between",
+            justifyContent: "space-between",
             alignItems: "center",
             marginBottom: "20px",
             borderBottom: "2px solid #dee2e6",
@@ -143,7 +143,7 @@ function App() {
           )}
 
           {!loading && !error && energyData.length === 0 && (
-            <p style={{ color: "#6c757d", italic: "true" }}>
+            <p style={{ color: "#6c757d", fontStyle: "italic" }}>
               Nu există loguri energetice disponibile în containerul de stocare.
             </p>
           )}
@@ -197,7 +197,7 @@ function App() {
     );
   }
 
-  // Ecranul inițial de pornire (Vizibil când vizitatorul NU este logat)
+  // ECRANUL DE PORNIRE (Vizibil DOAR când starea 'token' este nullă)
   return (
     <div
       style={{
@@ -221,7 +221,7 @@ function App() {
           boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
         }}
       >
-        <h1 style={{ marginBottom: "10px", fontSize: "2.5rem" }}>⚡ Monitorizare Energie cloud</h1>
+        <h1 style={{ marginBottom: "10px", fontSize: "2.5rem" }}>⚡ Monitorizare Energie Cloud</h1>
         <p style={{ color: "#adb5bd", marginBottom: "30px" }}>
           Proiect Cloud Computing - Universitatea Tehnică din Cluj-Napoca
         </p>
@@ -237,7 +237,6 @@ function App() {
             cursor: "pointer",
             fontWeight: "bold",
             boxShadow: "0 4px 15px rgba(40,167,69,0.4)",
-            transition: "0.2s",
           }}
         >
           🔒 Sign In securizat cu AWS Cognito
