@@ -4,12 +4,9 @@ export const LOGOUT_URI = "https://app-tucn-cc-dev-balotaa.azurewebsites.net/";
 
 export const OIDC_CONFIG = {
   authority: "https://cognito-idp.eu-north-1.amazonaws.com/eu-north-1_jyLIY5S7E",
-  client_id: "66qeenpqcd42fgcubpeunepbr0", // ID-ul real lung
+  client_id: "66qeenpqcd42fgcubpeunepbr0", // ID-ul tău real din AWS
   redirect_uri: "https://app-tucn-cc-dev-balotaa.azurewebsites.net/",
-  response_type: "code", // ⬅️ Schimbăm înapoi în "code"
+  response_type: "code", // ⬅️ Rutarea originală pe bază de Code pe care o vrea profesorul!
   scope: "openid email profile",
-  loadUserInfo: false,
-  onSigninCallback: () => {
-    window.history.replaceState({}, document.title, window.location.pathname);
-  },
+  loadUserInfo: false
 };
