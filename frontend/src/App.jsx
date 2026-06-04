@@ -6,6 +6,26 @@ import "./App.css";
 function App() {
   const auth = useAuth();
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    // Dacă URL-ul conține parametrii de la Cognito, dar suntem blocați în eroare de state
+    if (params.has("code") && params.has("state")) {
+      // Ștergem manual din sesiunea browserului orice tentativă de stocare OIDC anterioară
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key && (key.startsWith("oidc.") || key.includes("authority"))) {
+          sessionStorage.removeItem(key);
+        }
+      }
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith("oidc.") || key.includes("authority"))) {
+          localStorage.removeItem(key);
+        }
+      }
+    }
+  }, []);
+
   const [profile, setProfile] = useState(null);
   const [dataResponse, setDataResponse] = useState(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
@@ -90,17 +110,20 @@ function App() {
     );
   }
 
-  // 🔽 BLOC MODIFICAT PENTRU BYPASS AUTOMAT AL ERORII DE STATE 🔽
+  // Blocurile OIDC sunt acum mapate și curățate complet de sintaxa duplicată
   if (auth.error) {
     const errMsg = auth.error.message?.toLowerCase() || "";
     if (errMsg.includes("state") || errMsg.includes("storage") || errMsg.includes("validate")) {
+      sessionStorage.clear();
+      localStorage.clear();
+
       setTimeout(() => {
-        // Ștergem „mizeria” de code și state din URL și reîncărcăm curat pe /
         window.location.href = window.location.origin + window.location.pathname;
-      }, 400);
+      }, 300);
+
       return (
         <div className="app-shell">
-          <div className="status-panel">Sincronizare sesiune securizată... Se reîncarcă...</div>
+          <div className="status-panel">Sincronizare și resetare stocare browser...</div>
         </div>
       );
     }
@@ -113,7 +136,6 @@ function App() {
       </div>
     );
   }
-  // 🔼 SFÂRȘIT BLOC MODIFICAT 🔼
 
   return (
     <div className="app-shell">
@@ -194,7 +216,6 @@ function App() {
               )}
             </section>
 
-            {/* SECȚIUNEA NOUĂ PENTRU DATELE DIN BLOB STORAGE CSV */}
             <section className="card card-wide">
               <div className="section-head">
                 <h2>Energy Data Logs (from Azure Blob Storage)</h2>
