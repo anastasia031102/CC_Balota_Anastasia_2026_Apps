@@ -12,6 +12,7 @@
   "license": "MIT",
   "type": "commonjs",
   "dependencies": {
+    "@azure/storage-blob": "^12.32.0",
     "jsonwebtoken": "^9.0.3",
     "jwks-rsa": "^4.0.1"
   }
