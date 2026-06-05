@@ -8,8 +8,6 @@ const {
 const { emit, finishRequest, maskDeviceId, startRequest } = require("../shared/logging");
 
 async function getEnergyData() {
-  // 🔥 REPARAT: În loc de cheia veche (key1) hardcoded care a expirat acum 10 zile,
-  // citim din variabila de sistem AzureWebJobsStorage unde ai configurat corect cheia nouă (key2)!
   const connectionString = process.env.AzureWebJobsStorage;
 
   if (!connectionString) {
@@ -33,17 +31,17 @@ async function getEnergyData() {
   const lines = csv.trim().split(/\r?\n/);
   if (lines.length < 2) return [];
 
-  // Curățăm antetul de caractere ascunse (BOM) care apar des pe Windows/Excel
+  // Curățăm antetul de caractere ascunse (BOM)
   const headers = lines[0].split(",").map((h) => h.trim().replace(/^\uFEFF/, ""));
 
   return lines.slice(1).map((line) => {
     const values = line.split(",").map((v) => v.trim());
     const rawObject = Object.fromEntries(headers.map((h, i) => [h, values[i]]));
 
-    // 🔥 SIGURANȚĂ FORMAT: Chiar dacă în CSV scrie deviceId sau device_id, standardizăm totul pe device_id
     return {
       device_id: rawObject.device_id || rawObject.deviceId || rawObject.Device_ID || "N/A",
-      consumption: rawObject.consumption || rawObject.value || rawObject.consumption_kwh || 0,
+      // 🚀 MODIFICAT: Convertim direct valorile din coloana 'kwh' în numere reale
+      consumption: Number(rawObject.kwh) || 0,
       timestamp: rawObject.timestamp || rawObject.Time || "N/A",
       location: rawObject.location || "Default Location",
     };
@@ -78,7 +76,6 @@ module.exports = async function data(context, req) {
         finishRequest(context, request, 403);
         return;
       }
-      // Filtrarea va funcționa garantat datorită standardizării de mai sus
       visibleData = allData.filter((item) => item.device_id === device_id);
     } else {
       context.res = jsonResponseWithCorrelation(
@@ -90,9 +87,14 @@ module.exports = async function data(context, req) {
       return;
     }
 
+    // 🚀 MODIFICAT: Împachetăm răspunsul în structura exactă de obiect pe care o cere interfața
     context.res = jsonResponseWithCorrelation(
       200,
-      visibleData, // 🔥 REPARAT: Trimitem direct array-ul de date curat pe care frontend-ul profesorului vrea să îl citească
+      {
+        role: role,
+        device_id: device_id,
+        data: visibleData,
+      },
       request.correlationId
     );
     finishRequest(context, request, 200);
