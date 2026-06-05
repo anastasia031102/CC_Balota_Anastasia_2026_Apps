@@ -172,10 +172,57 @@ function App() {
               )}
             </section>
 
+            {/* 📊 SECȚIUNEA REPARATĂ: Transforma textul JSON brut într-un tabel HTML curat */}
             <section className="card card-wide">
-              <h2>Data API Response</h2>
+              <h2>Data API Response (CSV Datasets)</h2>
               {loadingData ? (
                 <p className="muted">Loading data...</p>
+              ) : dataResponse && dataResponse.data && dataResponse.data.length > 0 ? (
+                <div style={{ overflowX: "auto", marginTop: "15px" }}>
+                  <table
+                    style={{
+                      width: "100%",
+                      borderCollapse: "collapse",
+                      textAlign: "left",
+                      fontSize: "14px",
+                    }}
+                  >
+                    <thead>
+                      <tr
+                        style={{ borderBottom: "2px solid rgba(255,255,255,0.1)", color: "#aaa" }}
+                      >
+                        <th style={{ padding: "12px 8px" }}>Device ID</th>
+                        <th style={{ padding: "12px 8px" }}>Timestamp</th>
+                        <th style={{ padding: "12px 8px", textAlign: "right" }}>Consumption</th>
+                        <th style={{ padding: "12px 8px" }}>Location</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dataResponse.data.map((item, index) => (
+                        <tr
+                          key={index}
+                          style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}
+                        >
+                          <td style={{ padding: "12px 8px", fontWeight: "600", color: "#61dafb" }}>
+                            {item.device_id}
+                          </td>
+                          <td style={{ padding: "12px 8px", color: "#ddd" }}>{item.timestamp}</td>
+                          <td
+                            style={{
+                              padding: "12px 8px",
+                              textAlign: "right",
+                              fontWeight: "700",
+                              color: "#4caf50",
+                            }}
+                          >
+                            {item.consumption} kWh
+                          </td>
+                          <td style={{ padding: "12px 8px", color: "#ccc" }}>{item.location}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               ) : dataResponse ? (
                 <pre className="code-block">{JSON.stringify(dataResponse, null, 2)}</pre>
               ) : (
